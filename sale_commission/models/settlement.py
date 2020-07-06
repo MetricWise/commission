@@ -29,7 +29,7 @@ class Settlement(models.Model):
                    ("except_invoice", "Invoice exception")], string="State",
         readonly=True, default="settled")
     invoice = fields.Many2one(
-        comodel_name="account.invoice", string="Generated invoice",
+        comodel_name="account.move", string="Generated invoice",
         readonly=True)
     currency_id = fields.Many2one(
         comodel_name='res.currency', readonly=True,
@@ -45,14 +45,12 @@ class Settlement(models.Model):
         for record in self:
             record.total = sum(x.settled_amount for x in record.lines)
 
-    @api.multi
     def action_cancel(self):
         if any(x.state != 'settled' for x in self):
             raise exceptions.Warning(
                 _('Cannot cancel an invoiced settlement.'))
         self.write({'state': 'cancel'})
 
-    @api.multi
     def unlink(self):
         """Allow to delete only cancelled settlements"""
         if any(x.state == 'invoiced' for x in self):
@@ -60,7 +58,6 @@ class Settlement(models.Model):
                 _("You can't delete invoiced settlements."))
         return super(Settlement, self).unlink()
 
-    @api.multi
     def action_invoice(self):
         return {
             'type': 'ir.actions.act_window',
@@ -73,7 +70,7 @@ class Settlement(models.Model):
         }
 
     def _prepare_invoice_header(self, settlement, journal, date=False):
-        invoice = self.env['account.invoice'].new({
+        invoice = self.env['account.move'].new({
             'partner_id': settlement.agent.id,
             'type': ('in_invoice' if journal.type == 'purchase' else
                      'in_refund'),
@@ -88,7 +85,7 @@ class Settlement(models.Model):
         return invoice._convert_to_write(invoice._cache)
 
     def _prepare_invoice_line(self, settlement, invoice, product):
-        invoice_line = self.env['account.invoice.line'].new({
+        invoice_line = self.env['account.move.line'].new({
             'invoice_id': invoice.id,
             'product_id': product.id,
             'quantity': 1,
@@ -124,11 +121,10 @@ class Settlement(models.Model):
         find open invoices
         """
         invoice_vals = self._prepare_invoice_header(self, journal, date=date)
-        return self.env['account.invoice'].create(invoice_vals)
+        return self.env['account.move'].create(invoice_vals)
 
-    @api.multi
     def make_invoices(self, journal, product, date=False):
-        invoice_line_obj = self.env['account.invoice.line']
+        invoice_line_obj = self.env['account.move.line']
         for settlement in self:
             # select the proper journal according to settlement's amount
             # considering _add_extra_invoice_lines sum of values
@@ -159,15 +155,15 @@ class SettlementLine(models.Model):
         "sale.commission.settlement", readonly=True, ondelete="cascade",
         required=True)
     agent_line = fields.Many2many(
-        comodel_name='account.invoice.line.agent',
+        comodel_name='account.move.line.agent',
         relation='settlement_agent_line_rel', column1='settlement_id',
         column2='agent_line_id', required=True)
     date = fields.Date(related="agent_line.invoice_date", store=True)
     invoice_line = fields.Many2one(
-        comodel_name='account.invoice.line', store=True,
+        comodel_name='account.move.line', store=True,
         related='agent_line.object_id')
     invoice = fields.Many2one(
-        comodel_name='account.invoice', store=True, string="Invoice",
+        comodel_name='account.move', store=True, string="Invoice",
         related='invoice_line.invoice_id')
     agent = fields.Many2one(
         comodel_name="res.partner", readonly=True, related="agent_line.agent",

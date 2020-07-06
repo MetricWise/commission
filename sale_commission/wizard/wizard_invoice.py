@@ -42,7 +42,6 @@ class SaleCommissionMakeInvoice(models.TransientModel):
     from_settlement = fields.Boolean(default=_default_from_settlement)
     date = fields.Date()
 
-    @api.multi
     def button_create(self):
         self.ensure_one()
         if not self.settlements:
@@ -59,7 +58,7 @@ class SaleCommissionMakeInvoice(models.TransientModel):
                 'name': _('Created Invoices'),
                 'type': 'ir.actions.act_window',
                 'views': [[False, 'list'], [False, 'form']],
-                'res_model': 'account.invoice',
+                'res_model': 'account.move',
                 'domain': [
                     ['id', 'in', [x.invoice.id for x in self.settlements]],
                 ],
